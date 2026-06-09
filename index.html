@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SL Car Price Predictor</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h2>🚗 Sri Lankan Car Price Predictor AI</h2>
+        <p>Enter the vehicle details below to estimate the current market value.</p>
+        
+        <form id="predictionForm">
+            <div class="form-group">
+                <label>Brand:</label>
+                <input type="text" id="brand" placeholder="e.g., Suzuki, Toyota" required>
+            </div>
+            
+            <div class="form-group">
+                <label>Model:</label>
+                <input type="text" id="model_name" placeholder="e.g., Wagon R, Axio" required>
+            </div>
+
+            <div class="form-group">
+                <label>Engine Capacity (cc):</label>
+                <input type="number" id="engine_cc" value="660" required>
+            </div>
+
+            <div class="form-group">
+                <label>Mileage (KM):</label>
+                <input type="number" id="mileage" value="75000" required>
+            </div>
+
+            <div class="form-group">
+                <label>Town / Location:</label>
+                <input type="text" id="town" placeholder="e.g., Colombo, Horana" required>
+            </div>
+
+            <div class="form-group">
+                <label>Vehicle Age (Years):</label>
+                <input type="number" id="car_age" value="7" required>
+            </div>
+
+            <div class="form-group">
+                <label>Fuel Type:</label>
+                <select id="fuel_type">
+                    <option value="Petrol">Petrol</option>
+                    <option value="Hybrid">Hybrid</option>
+                    <option value="Diesel">Diesel</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Transmission:</label>
+                <select id="gear_type">
+                    <option value="Automatic">Automatic</option>
+                    <option value="Manual">Manual</option>
+                </select>
+            </div>
+
+            <button type="submit" id="submitBtn">🔮 Estimate Vehicle Price</button>
+        </form>
+
+        <div id="resultContainer" class="result-box hidden">
+            <h3>🔮 AI Estimated Value:</h3>
+            <div id="priceLakhs" class="price-lakhs"></div>
+            <div id="priceLkr" class="price-lkr"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
