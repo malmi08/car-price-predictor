@@ -1,83 +1,99 @@
-import os
-import urllib.request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pandas as pd
 import pickle
 
-app = FastAPI()
+app = FastAPI(title="Sri Lankan Car Price Predictor API")
 
-# Enable CORS so Frontend can talk to Backend
+# Enable CORS so your Vercel frontend can talk to this Railway backend safely
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Google Drive Direct Download Links
-MODEL_URL = "https://docs.google.com/uc?export=download&id=1fQlUaIG9PKujWzAvton1ZC7Q7X0k5JQ7"
-ENCODER_URL = "https://docs.google.com/uc?export=download&id=1yQWYN51Pe95eJalPKxlWBDmjiJTOpZhV"
+# Global variables to hold our model and encoder
+model = None
+encoder = None
 
-MODEL_PATH = "car_price_model.pkl"
-ENCODER_PATH = "target_encoder.pkl"
+# Load machine learning files on startup
+@app.on_event("startup")
+def load_artifacts():
+    global model, encoder
+    try:
+        with open('car_price_model.pkl', 'rb') as model_file:
+            model = pickle.load(model_file)
+        with open('target_encoder.pkl', 'rb') as encoder_file:
+            encoder = pickle.load(encoder_file)
+        print("🤖 ML Model and Encoder loaded successfully!")
+    except Exception as e:
+        print(f"❌ Error loading pickle files: {str(e)}")
 
-# Function to download files from Google Drive if they don't exist
-def download_file(url, path):
-    if not os.path.exists(path):
-        print(f"Downloading {path} from Google Drive...")
-        urllib.request.urlretrieve(url, path)
-        print(f"{path} downloaded successfully!")
-
-# Download models before starting the API
-download_file(MODEL_URL, MODEL_PATH)
-download_file(ENCODER_URL, ENCODER_PATH)
-
-# Load the trained Model and Target Encoder
-with open(MODEL_PATH, "rb") as f:
-    model = pickle.load(f)
-
-with open(ENCODER_PATH, "rb") as f:
-    target_encoder = pickle.load(f)
-
-# Define Input Data Format
-class CarInput(BaseModel):
+# Define the structured schema for incoming JSON data (Pydantic model)
+class CarFeatures(BaseModel):
     brand: str
     model_name: str
-    engine_cc: float
-    mileage: float
+    engine_cc: int
+    mileage: int
     town: str
-    car_age: float
+    car_age: int
     fuel_type: str
     gear_type: str
 
-@app.get("/")
-def home():
-    return {"message": "Sri Lankan Car Price Predictor API is running!"}
+# Load index.html as the main page
+@app.get("/", response_class=HTMLResponse)
+def root():
+    with open("index.html", "r", encoding="utf-8") as f:
+        return f.read()
 
 @app.post("/predict")
-def predict_price(data: CarInput):
-    try:
-        # Convert input data to Dictionary
-        input_dict = data.dict()
-        df = pd.DataFrame([input_dict])
-
-        # Target Encode Categorical Columns
-        categorical_cols = ['brand', 'model_name', 'town', 'fuel_type', 'gear_type']
-        df[categorical_cols] = target_encoder.transform(df[categorical_cols])
-
-        # Make Prediction (Model outputs price in Lakhs)
-        predicted_lakhs = model.predict(df)[0]
+def predict_price(car: CarFeatures):
+    if model is None or encoder is None:
+        raise HTTPException(status_code=500, detail="Model assets are not loaded properly on the server.")
         
-        # Convert Lakhs to Full LKR Price (1 Lakh = 100,000 LKR)
-        predicted_lkr = predicted_lakhs * 100000
-
+    try:
+        # 1. Structure the input JSON into training data format
+        input_data = {
+            'Brand': [car.brand],
+            'Model': [car.model_name],
+            'Engine (cc)': [car.engine_cc],
+            'Millage(KM)': [car.mileage],
+            'Town': [car.town],
+            'Car_Age': [car.car_age],
+            'Fuel Type_Hybrid': [1 if car.fuel_type.lower() == 'hybrid' else 0],
+            'Fuel Type_Petrol': [1 if car.fuel_type.lower() == 'petrol' else 0],
+            'Gear_Manual': [1 if car.gear_type.lower() == 'manual' else 0]
+        }
+        
+        # 2. Convert to DataFrame
+        df_input = pd.DataFrame(input_data)
+        
+        # 3. Transform using the Pre-trained Target Encoder
+        df_input[['Brand', 'Model', 'Town']] = encoder.transform(df_input[['Brand', 'Model', 'Town']])
+        
+        # 4. Predict the price using Random Forest Model
+        predicted_price = model.predict(df_input)[0]
+        
+        # 5. Return JSON Response to Frontend
         return {
             "status": "success",
-            "price_lakhs": f"Rs. {round(predicted_lakhs, 2)} Lakhs",
-            "price_lkr": f"Rs. {int(predicted_lkr):,}"
+            "predicted_price_lakhs": round(predicted_price, 2),
+            "estimated_lkr": int(predicted_price * 100000)
         }
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Prediction failed. Check inputs or spellings. Error: {str(e)}")
+    
+    # html load for first page
+@app.get("/", response_class=HTMLResponse)
+def root():
+    with open("index.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+# CSS and JS file Link
+app.mount("/", StaticFiles(directory="."), name="static")
