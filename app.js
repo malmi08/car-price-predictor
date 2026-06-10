@@ -4,10 +4,11 @@ document.getElementById('predictionForm').addEventListener('submit', async funct
     const submitBtn = document.getElementById('submitBtn');
     const resultContainer = document.getElementById('resultContainer');
     
-    submitBtn.innerText = "Processing... ⏳";
+    // Change button text to processing and disable it to prevent multiple duplicate clicks
+    submitBtn.innerText = "Processing..";
     submitBtn.disabled = true;
 
-    // Capture inputs
+    // Correctly extract and format input data from the HTML form
     const carData = {
         brand: document.getElementById('brand').value,
         model_name: document.getElementById('model_name').value,
@@ -19,11 +20,11 @@ document.getElementById('predictionForm').addEventListener('submit', async funct
         gear_type: document.getElementById('gear_type').value
     };
 
-    // 🚨 සටහන: දැනට ලෝකල් මැෂින් එකේ ටෙස්ට් කරන්න http://127.0.0.1:8000/predict පාවිච්චි කරන්න.
-    // Railway එකට දැම්මාට පස්සේ Railway URL එක මෙතනට දාන්න ඕනේ.
-    const BACKEND_URL = "http://127.0.0.1:8000/predict"; 
+    // URL endpoint of the locally running FastAPI backend server
+    const BACKEND_URL = "/predict"; 
 
     try {
+        // Send data to the Backend API via a POST Request
         const response = await fetch(BACKEND_URL, {
             method: "POST",
             headers: {
@@ -34,18 +35,27 @@ document.getElementById('predictionForm').addEventListener('submit', async funct
 
         const result = await response.json();
 
-        if (response.ok) {
+        if (response.ok && result.status === "success") {
+            // Display the predicted prices from the backend inside the HTML elements
             document.getElementById('priceLakhs').innerText = `LKR ${result.predicted_price_lakhs} Lakhs`;
-            document.getElementById('priceLkr').innerText = `Approx: රු. ${result.estimated_lkr.toLocaleString()}`;
+            document.getElementById('priceLkr').innerText = `Approx: LKR. ${result.estimated_lkr.toLocaleString()}`;
+            
+            // Make the result container visible by removing the hidden class
             resultContainer.classList.remove('hidden');
+            
+            // Smoothly scroll the screen down to focus on the displayed result
+            resultContainer.scrollIntoView({ behavior: 'smooth' });
         } else {
-            alert("Error: " + result.detail);
+            // Display an alert message if the backend returns a validation or validation error
+            alert("Error from Server: " + (result.detail || "Prediction failed. Please check inputs."));
         }
     } catch (error) {
+        // Log connection error and notify user if the server is offline
         console.error("Error connecting to API:", error);
-        alert("Failed to connect to the Backend API. Make sure your FastAPI is running!");
+        alert("Failed to connect to the Backend API. Make sure your FastAPI server is running locally (uvicorn main:app --reload)!");
     } finally {
-        submitBtn.innerText = "🔮 Estimate Vehicle Price";
+        // Reset the button back to its initial state regardless of success or failure
+        submitBtn.innerText = " Estimate Vehicle Price";
         submitBtn.disabled = false;
     }
 });
